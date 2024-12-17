@@ -47,7 +47,7 @@ export default function Home() {
               onClick={() => signIn('github')}
               className="w-full flex items-center justify-center bg-black text-white px-4 py-2 rounded hover:bg-gray-900 transition-colors"
             >
-              <img src="/github-logo.svg" alt="GitHub logo" className="w-5 h-5 mr-2" />
+              <img src="/github-mark.svg" alt="GitHub logo" className="w-5 h-5 mr-2" />
               Sign in with GitHub
             </button>
           </div>
