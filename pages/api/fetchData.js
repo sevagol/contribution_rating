@@ -1,5 +1,7 @@
+// pages/api/fetchData.js
 import { getSession } from 'next-auth/react'
-import db from '../../lib/db'
+import dbConnect from '../../lib/db'
+import Leaderboard from '../../models/Leaderboard'
 
 export default async function handler(req, res) {
   const session = await getSession({ req })
@@ -8,9 +10,10 @@ export default async function handler(req, res) {
   }
 
   const accessToken = session.accessToken
-  const username = session.user.login || session.user.name // Adjust as needed
+  // Adjust username extraction if needed. Some sessions have `session.user.login`.
+  const username = session.user.name || session.user.login 
 
-  // Fetch user repos & calculate rating (same logic as before)
+  // Fetch public repos
   const reposResponse = await fetch(`https://api.github.com/user/repos?per_page=100&visibility=public`, {
     headers: {
       Authorization: `token ${accessToken}`
@@ -24,7 +27,6 @@ export default async function handler(req, res) {
 
   for (const repo of repos) {
     const { name, owner, stargazers_count } = repo
-
     const commitsResponse = await fetch(`https://api.github.com/repos/${owner.login}/${name}/commits?author=${username}&per_page=100`, {
       headers: { Authorization: `token ${accessToken}` }
     })
@@ -44,12 +46,13 @@ export default async function handler(req, res) {
 
   const rating = totalCommits * totalStars
 
-  // Store / update rating in the database
-  const upsert = db.prepare(`
-    INSERT INTO leaderboard (username, rating) VALUES (?, ?)
-    ON CONFLICT(username) DO UPDATE SET rating=excluded.rating
-  `)
-  upsert.run(username, rating)
+  // Connect to MongoDB and upsert the user's rating
+  await dbConnect()
+  await Leaderboard.findOneAndUpdate(
+    { username },
+    { username, rating },
+    { upsert: true, new: true }
+  )
 
   return res.status(200).json({ rating, totalCommits, totalStars, repos: repoDataList })
 }

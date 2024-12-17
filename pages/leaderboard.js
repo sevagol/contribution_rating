@@ -1,3 +1,4 @@
+// pages/leaderboard.js
 import { useState, useEffect } from 'react'
 
 export default function Leaderboard() {
@@ -10,7 +11,7 @@ export default function Leaderboard() {
   }, [])
 
   return (
-    <div className="w-full max-w-md bg-white rounded-lg shadow-sm p-6">
+    <div className="w-full max-w-md bg-white rounded-lg shadow-sm p-6 mx-auto">
       <h1 className="text-2xl font-semibold text-gray-800 mb-4 text-center">Leaderboard</h1>
       <table className="w-full border border-gray-300 rounded-lg overflow-hidden text-left">
         <thead className="bg-gray-100">

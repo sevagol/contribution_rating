@@ -1,6 +1,10 @@
-import db from '../../lib/db'
+// pages/api/leaderboard.js
+import dbConnect from '../../lib/db'
+import Leaderboard from '../../models/Leaderboard'
 
-export default function handler(req, res) {
-  const rows = db.prepare(`SELECT username, rating FROM leaderboard ORDER BY rating DESC LIMIT 10`).all()
-  res.status(200).json(rows)
+export default async function handler(req, res) {
+  await dbConnect()
+  
+  const leaders = await Leaderboard.find().sort({ rating: -1 }).limit(10).lean()
+  return res.status(200).json(leaders)
 }
