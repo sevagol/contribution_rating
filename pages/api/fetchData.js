@@ -70,28 +70,30 @@ export default async function handler(req, res) {
 
   const repoResults = await Promise.all(commitPromises)
 
+  let totalRating = 0
   let totalCommits = 0
   let totalStars = 0
-  const repoDataList = []
-
+  
   for (const result of repoResults) {
     const { repoName, commits, stars } = result
+  
     if (commits > 0) {
+      // Count total commits and stars for display
       totalCommits += commits
       totalStars += stars
-      repoDataList.push({ repoName, commits, stars })
+  
+      // New rating calculation
+      if (stars > 0) {
+        // If the repo has stars, multiply commits by stars
+        totalRating += commits * stars
+      } else {
+        // If the repo has 0 stars, count each commit as 1 point
+        totalRating += commits
+      }
     }
   }
-
-  const rating = totalCommits * totalStars
-
-  // Connect to MongoDB and upsert the user's rating
-  await dbConnect()
-  await Leaderboard.findOneAndUpdate(
-    { username },
-    { username, rating },
-    { upsert: true, new: true }
-  )
-
-  return res.status(200).json({ rating, totalCommits, totalStars, repos: repoDataList })
+  
+  // `totalRating` now reflects the updated logic
+  return res.status(200).json({ rating: totalRating, totalCommits, totalStars, repos: repoDataList })
+  
 }
