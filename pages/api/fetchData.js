@@ -10,54 +10,76 @@ export default async function handler(req, res) {
   }
 
   const accessToken = session.accessToken
-  const username = session.user.login || session.user.name // Adjust if needed
+  const username = session.user.login || session.user.name
 
-  // Fetch public repos
-  const reposResponse = await fetch(`https://api.github.com/user/repos?per_page=100&visibility=public`, {
-    headers: {
-      Authorization: `token ${accessToken}`
+  // We'll fetch repos 5 at a time and page through results
+  const perPage = 5
+  let page = 1
+  const allRepos = []
+
+  // Limit pages to avoid long runs (e.g., 5 pages => max 25 repos)
+  const maxPages = 5
+
+  for (; page <= maxPages; page++) {
+    const reposResponse = await fetch(
+      `https://api.github.com/user/repos?per_page=${perPage}&visibility=public&page=${page}`,
+      {
+        headers: { Authorization: `token ${accessToken}` }
+      }
+    )
+
+    if (!reposResponse.ok) {
+      // If a page fails to fetch, just break early or handle gracefully
+      break
+    }
+
+    const repos = await reposResponse.json()
+    if (!Array.isArray(repos) || repos.length === 0) {
+      // No more repos to fetch
+      break
+    }
+
+    allRepos.push(...repos)
+    // If less than perPage returned, no more repos
+    if (repos.length < perPage) {
+      break
+    }
+  }
+
+  // Now we have a combined list of all repos fetched in batches of 5
+  // Fetch commits for all repos in parallel
+  const headers = { Authorization: `token ${accessToken}` }
+
+  const commitPromises = allRepos.map(async repo => {
+    const { name, owner, stargazers_count } = repo
+    const commitsRes = await fetch(
+      `https://api.github.com/repos/${owner.login}/${name}/commits?author=${username}&per_page=100`,
+      { headers }
+    )
+    if (!commitsRes.ok) {
+      return { repoName: name, commits: 0, stars: stargazers_count || 0 }
+    }
+    const commits = await commitsRes.json()
+    const commitCount = Array.isArray(commits) ? commits.length : 0
+    return {
+      repoName: name,
+      commits: commitCount,
+      stars: stargazers_count || 0
     }
   })
 
-  if (!reposResponse.ok) {
-    return res.status(reposResponse.status).json({ error: 'Failed to fetch repos from GitHub' })
-  }
-
-  const repos = await reposResponse.json()
-  if (!Array.isArray(repos)) {
-    return res.status(500).json({ error: 'Unexpected response format from GitHub' })
-  }
-
-  // Fetch commits for all repos in parallel
-  const commitFetches = repos.map(repo => {
-    const { name, owner } = repo
-    return fetch(`https://api.github.com/repos/${owner.login}/${name}/commits?author=${username}&per_page=100`, {
-      headers: { Authorization: `token ${accessToken}` }
-    })
-      .then(res => res.ok ? res.json() : [])
-      .then(commits => {
-        const commitCount = Array.isArray(commits) ? commits.length : 0
-        return {
-          repoName: name,
-          commitCount,
-          stars: repo.stargazers_count || 0
-        }
-      })
-      .catch(() => ({ repoName: name, commitCount: 0, stars: 0 }))
-  })
-
-  const results = await Promise.all(commitFetches)
+  const repoResults = await Promise.all(commitPromises)
 
   let totalCommits = 0
   let totalStars = 0
   const repoDataList = []
 
-  for (const result of results) {
-    const { repoName, commitCount, stars } = result
-    if (commitCount > 0) {
-      totalCommits += commitCount
+  for (const result of repoResults) {
+    const { repoName, commits, stars } = result
+    if (commits > 0) {
+      totalCommits += commits
       totalStars += stars
-      repoDataList.push({ repoName, commits: commitCount, stars })
+      repoDataList.push({ repoName, commits, stars })
     }
   }
 
