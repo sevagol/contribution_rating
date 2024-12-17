@@ -19,5 +19,6 @@ export default NextAuth({
       session.accessToken = token.accessToken
       return session
     }
-  }
+  },
+  secret: process.env.NEXTAUTH_SECRET, // Add this line
 })
