@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     )
 
     if (!reposResponse.ok) {
-      // If a page fails to fetch, just break early or handle gracefully
+      // If a page fails to fetch, just break early
       break
     }
 
@@ -40,6 +40,7 @@ export default async function handler(req, res) {
     }
 
     allRepos.push(...repos)
+
     // If less than perPage returned, no more repos
     if (repos.length < perPage) {
       break
@@ -78,22 +79,17 @@ export default async function handler(req, res) {
     const { repoName, commits, stars } = result
   
     if (commits > 0) {
-      // Count total commits and stars for display
       totalCommits += commits
       totalStars += stars
   
       // New rating calculation
       if (stars > 0) {
-        // If the repo has stars, multiply commits by stars
         totalRating += commits * stars
       } else {
-        // If the repo has 0 stars, count each commit as 1 point
         totalRating += commits
       }
     }
   }
-  
-  // `totalRating` now reflects the updated logic
-  return res.status(200).json({ rating: totalRating, totalCommits, totalStars, repos: repoDataList })
-  
+
+  return res.status(200).json({ rating: totalRating, totalCommits, totalStars, repos: repoResults })
 }
