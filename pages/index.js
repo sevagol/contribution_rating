@@ -1,62 +1,90 @@
-import { useSession, signIn, signOut } from 'next-auth/react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 
 export default function Home() {
-  const { data: session } = useSession()
+  const [username, setUsername] = useState('')
   const [ratingData, setRatingData] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(null)
 
-  useEffect(() => {
-    if (session) {
-      setIsLoading(true)
-      fetch('/api/fetchData')
-        .then(res => res.json())
-        .then(data => {
-          setRatingData(data)
-          setIsLoading(false)
-        })
-        .catch(() => {
-          // In case of an error, hide the loader
-          setIsLoading(false)
-        })
+  const handleFetchData = (e) => {
+    e.preventDefault()
+    if (!username) {
+      setError('Please enter a GitHub username')
+      return
     }
-  }, [session])
+
+    setIsLoading(true)
+    setError(null)
+    setRatingData(null)
+
+    fetch(`/api/fetchData?username=${encodeURIComponent(username)}`)
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('Failed to fetch data')
+        }
+        return res.json()
+      })
+      .then(data => {
+        setRatingData(data)
+        setIsLoading(false)
+      })
+      .catch((err) => {
+        setError(err.message)
+        setIsLoading(false)
+      })
+  }
 
   return (
     <div className="min-h-screen bg-green-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-lg shadow-sm p-6">
-        
         {/* Loading Progress Bar */}
         {isLoading && (
           <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden mb-4">
-            {/* A pulsating bar indicating loading */}
             <div className="bg-blue-500 h-full w-1/3 animate-pulse"></div>
           </div>
         )}
         
-        <h1 className="text-2xl font-semibold text-gray-800 mb-6 text-center">GitHub Rating</h1>
+        <h1 className="text-2xl font-semibold text-gray-800 mb-6 text-center">
+          GitHub Rating
+        </h1>
 
-        {!session && (
+        {!ratingData && !isLoading && (
           <div className="text-center">
             <p className="text-gray-700 mb-4">
-              This app calculates your GitHub rating by multiplying the total number of your commits
-              across your public repositories by the total number of stars those repositories have.
+              This app calculates your GitHub rating by taking the total commits across your public repositories and combining it with the number of stars they have.
+              <br />
+              If a repo has no stars, each commit counts as 1 point. If it has stars, commits are multiplied by the star count.
             </p>
-            <button
-              onClick={() => signIn('github')}
-              className="w-full flex items-center justify-center bg-black text-white px-4 py-2 rounded hover:bg-gray-900 transition-colors"
-            >
-              <img src="/github-mark.svg" alt="GitHub logo" className="w-5 h-5 mr-2" />
-              Sign in with GitHub
-            </button>
+            <form onSubmit={handleFetchData} className="mb-4">
+              <input
+                type="text"
+                placeholder="Enter GitHub username"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                className="w-full mb-2 px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <button
+                type="submit"
+                className="w-full bg-black text-white px-4 py-2 rounded hover:bg-gray-900 transition-colors"
+              >
+                Fetch Rating
+              </button>
+            </form>
+            {error && (
+              <p className="text-red-600">{error}</p>
+            )}
           </div>
         )}
 
-        {session && ratingData && !isLoading && (
+        {ratingData && !isLoading && (
           <>
-            <p className="text-lg text-gray-700 mb-2 text-center">Welcome, {session.user.name}</p>
-            <p className="text-xl font-bold text-gray-800 mb-4 text-center">Your Rating: {ratingData.rating}</p>
+            <p className="text-lg text-gray-700 mb-2 text-center">
+              Results for: {username}
+            </p>
+            <p className="text-xl font-bold text-gray-800 mb-4 text-center">
+              Your Rating: {ratingData.rating}
+            </p>
 
             <div className="text-sm text-gray-600 mb-6 text-center">
               Commits: <span className="font-semibold">{ratingData.totalCommits}</span> | Stars: <span className="font-semibold">{ratingData.totalStars}</span>
@@ -85,15 +113,21 @@ export default function Home() {
                 </table>
               </div>
             ) : (
-              <p className="mb-4 text-gray-600">No commits found in your public repositories.</p>
+              <p className="mb-4 text-gray-600">
+                No commits found in user&apos;s public repositories.
+              </p>
             )}
 
             <div className="flex justify-between items-center">
               <button
-                onClick={() => signOut()}
+                onClick={() => {
+                  setRatingData(null)
+                  setUsername('')
+                  setError(null)
+                }}
                 className="bg-gray-200 text-gray-800 px-3 py-1 rounded hover:bg-gray-300 transition-colors"
               >
-                Sign Out
+                New Search
               </button>
               <Link href="/leaderboard" className="text-blue-600 hover:underline">
                 View Leaderboard
